@@ -57,6 +57,7 @@ def main():
     # amplitude_error = calculated_field_bpm_abs - calculated_field_wpm_abs
     # to_tif('amplitude_error_bpm.tif', amplitude_error)
     # to_tif('calculated_field_bpm.tif', calculated_field_bpm_abs)
+    maxwell_fisheye = [m.requires_grad_(True) for m in maxwell_fisheye]
 
     prof = torch.profiler.profile(
         activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
@@ -149,14 +150,16 @@ def wpm(input_field, wavelength, index_of_refraction, d_xyz):
     return calculated_field
 
 
+# (fullgraph=True) could help but it required more changes to compile
+# set disable=True to disable the compiler
+@torch.compile(options={"max_autotune": True, "epilogue_fusion": True}, disable=False)
 def fast_wpm(input_field, wavelength, index_of_refraction, d_xyz, n_bucket_size: float = 1 / 64):
     # Try to WPM? ...the sorta-fast way
     fft, ifft, fftfreq = torch.fft.fftn, torch.fft.ifftn, torch.fft.fftfreq
     sqrt, exp, pi = torch.sqrt, torch.exp, torch.pi
     k = 2*pi/wavelength
     dx, dy, dz = d_xyz
-    nz, ny, nx = index_of_refraction.shape
-    index_of_refraction = [i.requires_grad_(True) for i in index_of_refraction]
+    ny, nx = index_of_refraction[0].shape[-2:]
     calculated_field = [input_field]
     print("Calculating (faster?) WPM propagation...", sep='', end='')
     kx_sq = ((2*pi/dx)*fftfreq(nx, device=DEVICE).reshape(1, 1, nx)).square()
