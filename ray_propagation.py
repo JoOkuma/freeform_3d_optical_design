@@ -662,6 +662,8 @@ def smooth_3d(a, sigma=5):
 
     Similar to scipy.ndimage.gaussian_filter(), but potentially faster via GPU.
     """
+    if sigma == 0:
+        return a
     assert a.ndim == 3
     assert isinstance(a, torch.Tensor)
     # Local nicknames:
